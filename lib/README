@@ -1,0 +1,14 @@
+temp sensor === DS18B20
+weight ==== HX711
+induction motor ==== PZEM-004T or ADE7753
+
+
+libs 
+
+  lib_deps =
+    milesburton/DallasTemperature @ ^3.9.1    ; Temp Sensors
+    bogde/HX711 @ ^0.7.5                       ; Load Cells
+    mandulaj/PZEM-004T-v30 @ ^1.1.2            ; Power Monitoring
+
+
+
