@@ -77,8 +77,7 @@ float PowerMonitor::getCurrent() {
 float PowerMonitor::smoothPower(float newPower) {
 
     if (!isValid(newPower)) {
-        logger.log(Logger::WARN, POWER_MONITOR_LOG_MODULE,
-                   "Skipping invalid power sample");
+        logger.log(Logger::WARN, POWER_MONITOR_LOG_MODULE, "Skipping invalid power sample");
         return -1.0f;
     }
 

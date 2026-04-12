@@ -11,4 +11,7 @@ libs
     mandulaj/PZEM-004T-v30 @ ^1.1.2            ; Power Monitoring
 
 
+linear actuator BTS7960 43A Motor Driver
+
+
 
