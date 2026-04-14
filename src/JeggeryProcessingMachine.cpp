@@ -76,6 +76,17 @@ JeggeryProcessState* JeggeryProcessingMachine::idToState(int id) {
     }
 }
 
+const char* JeggeryProcessingMachine::getCurrentStateName() {
+    if (currentState == idleState) return "IDLE";
+    if (currentState == fillingState) return "FILLING";
+    if (currentState == boilingState) return "BOILING";
+    if (currentState == oilSprayState) return "OIL_SPRAY";
+    if (currentState == finishingState) return "FINISHING";
+    if (currentState == unloadingState) return "UNLOADING";
+    if (currentState == resettingState) return "RESETTING";
+    return "UNKNOWN";
+}
+
 void JeggeryProcessingMachine::setValve(bool open) {
     // Add physical GPIO code here
     // digitalWrite(VALVE_PIN, open);
