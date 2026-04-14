@@ -1,31 +1,61 @@
 #include <Arduino.h>
-#include "TempManager.h"
-#include "WeightManager.h"
-#include "PowerMonitor.h"
-#include "pins.h"
+#include <esp_task_wdt.h>  // ESP32 Watchdog Library
+#include "JeggeryProcessingMachine.hpp"
+#include "Logger.h"
 
+// Define Watchdog Timeout (5 seconds is safe for industrial tasks)
+#define WDT_TIMEOUT_SECONDS 5
 
-TempManager temps(TEMP_BUS_PIN);
-WeightManager weight;
-PowerMonitor power(Serial2, 16, 17); // RX, TX
+JeggeryProcessingMachine machine;
+Logger &logger = Logger::getInstance();
 
-// ESP32 usually has the internal LED on GPIO 2
-const int ledPin = 2;
+void machineProcessTask(void *pvParameters) {
+    // 1. Initialize Watchdog for this specific task
+    esp_task_wdt_init(WDT_TIMEOUT_SECONDS, true); // true = panic/reboot on timeout
+    esp_task_wdt_add(NULL); // NULL adds the current task (Core 1) to WDT monitoring
+
+    // 2. Restore state from NVS
+    machine.begin();
+    logger.logf(Logger::INFO, "PROCESS_TASK", "Logic Task Started on Core 1");
+
+    for (;;) {
+        // 3. Reset (Pet) the Watchdog 
+        // If machine.update() hangs longer than 5s, the system reboots
+        esp_task_wdt_reset();
+
+        // 4. Run State Machine Logic
+        machine.update();
+
+        // 5. Update Persistence
+        machine.handleHeartbeat();
+
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
 
 void setup() {
+    // Note: USB CDC (USB Serial) might not be ready immediately 
+    // Add a small delay so you don't miss initial logs
     Serial.begin(115200);
-    temps.begin();
-    weight.begin(LOADCELL_DOUT, LOADCELL_SCK);
+    delay(1000); 
+
+    logger.logf(Logger::INFO, "SYSTEM", "Starting Jeggery Machine...");
+
+    // 6. START THE TASK (Missing in your snippet)
+    xTaskCreatePinnedToCore(
+        machineProcessTask,   /* Function */
+        "JeggeryLogic",       /* Name */
+        8192,                 /* Stack Size */
+        NULL,                 /* Param */
+        5,                    /* Priority */
+        NULL,                 /* Handle */
+        1                     /* Core 1 */
+    );
+
+    logger.logf(Logger::INFO, "SYSTEM", "Setup Complete. Task Dispatched.");
 }
 
 void loop() {
-    // 1. Read everything
-    float t1 = temps.getTempByIndex(0);
-    float w = weight.getWeight();
-    float p, f;
-    power.readData(p, f);
-
-    // 2. Logic (Example: Stop motor if weight > 10kg)
-
-    delay(500);
+    // Standard loop on Core 0
+    vTaskDelay(pdMS_TO_TICKS(1000)); 
 }
