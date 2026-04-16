@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include "Logger.h"
+#include "MachineConfig.h"
 
 static RTC_DATA_ATTR uint32_t lastSystemTimeBeforeReset; 
 
@@ -14,11 +15,7 @@ private:
     uint32_t restartThreshold = 60000;
     int stateToId(JeggeryProcessState* state);
     JeggeryProcessState* idToState(int id);
-
-
-    float weight = 0;
-    float brix = 0;
-    float temp = 0;
+    uint32_t stateStartTime = 0;
 
 public:
     JeggeryProcessState* idleState;
@@ -29,7 +26,8 @@ public:
     JeggeryProcessState* unloadingState;
     JeggeryProcessState* resettingState;
 
-    uint32_t stateStartTime = 0;
+    
+    MachineConfig config;
 
     JeggeryProcessingMachine();
 
@@ -45,15 +43,18 @@ public:
 
     void update();
     void handleHeartbeat();
+    const char* getCurrentStateName();
 
     // Declare these (Implementation must be in .cpp)
-    void setValve(bool open);
+    void setJuiceFillingValve(bool open);
     void setHeater(int powerLevel); 
     void sprayOil();
     void setPanTilt(bool tilted);
 
     // Sensor Getters (Keep inline or move to .cpp)
-    float getTemperature() { return temp += 2; }
-    float getBrix() { return brix += 2; }
-    float getWeight() { return weight += 5; }
+    float getTemperature() { return 0;}
+    float getBrix() {return 0 ;}
+    float getWeight() {return 0 ;}
+    uint32_t getStateStartTime(){return stateStartTime;}
 };
+

@@ -87,7 +87,7 @@ const char* JeggeryProcessingMachine::getCurrentStateName() {
     return "UNKNOWN";
 }
 
-void JeggeryProcessingMachine::setValve(bool open) {
+void JeggeryProcessingMachine::setJuiceFillingValve(bool open) {
     // Add physical GPIO code here
     // digitalWrite(VALVE_PIN, open);
 }

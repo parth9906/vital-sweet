@@ -6,7 +6,6 @@
 #include "Logger.h"
 
 #define TEMPRETURE_LOG_MODULE "TempManager"
-#define LOG Logger::getInstance()
 
 const float TEMP_DISCONNECTED = -127.0;
 const float TEMP_POWER_ON_GLITCH = 85.0;
@@ -14,16 +13,14 @@ const float TEMP_MAX_VALID = 125.0;
 const float BUBBLE_DEVIATION_THRESHOLD = 1.5;
 
 TempManager::TempManager(int dataPin)
-    : oneWire(dataPin), sensors(&oneWire), sensorCount(0) {
-        Logger& sysLog = Logger::getInstance();
-    }
+    : oneWire(dataPin), sensors(&oneWire), sensorCount(0), logger(Logger::getInstance()) {}
 
 void TempManager::begin()
 {
     sensors.begin();
     sensorCount = sensors.getDeviceCount();
 
-    LOG.logf(Logger::INFO, TEMPRETURE_LOG_MODULE, "Initialized with %d sensors", sensorCount);
+    logger.logf(Logger::INFO, TEMPRETURE_LOG_MODULE, "Initialized with %d sensors", sensorCount);
 }
 
 float TempManager::getTempByIndex(int sensorIndex)
@@ -31,7 +28,7 @@ float TempManager::getTempByIndex(int sensorIndex)
     sensors.requestTemperatures();
     float temperature = sensors.getTempCByIndex(sensorIndex);
 
-    LOG.logf(Logger::DEBUG, TEMPRETURE_LOG_MODULE,  "Sensor %d reading: %.2f°C", sensorIndex, temperature);
+    logger.logf(Logger::DEBUG, TEMPRETURE_LOG_MODULE,  "Sensor %d reading: %.2f°C", sensorIndex, temperature);
     return temperature;
 }
 
@@ -45,11 +42,11 @@ float TempManager::getAverageTemp()
     {
         float currentTemp = sensors.getTempCByIndex(i);
 
-        LOG.logf(Logger::DEBUG, TEMPRETURE_LOG_MODULE, "Raw reading (Sensor %d): %.2f°C", i, currentTemp);
+        logger.logf(Logger::DEBUG, TEMPRETURE_LOG_MODULE, "Raw reading (Sensor %d): %.2f°C", i, currentTemp);
         // 1. Check disconnected sensor
         if (currentTemp == TEMP_DISCONNECTED || std::isnan(currentTemp))
         {
-            LOG.logf(Logger::WARN, TEMPRETURE_LOG_MODULE, "Sensor %d disconnected or invalid", i);
+            logger.logf(Logger::WARN, TEMPRETURE_LOG_MODULE, "Sensor %d disconnected or invalid", i);
             continue;
         }
 
@@ -67,7 +64,7 @@ float TempManager::getAverageTemp()
                     std::abs(currentTemp - neighborTemp) > 10.0)
                 {
 
-                    LOG.logf(Logger::WARN, TEMPRETURE_LOG_MODULE, "Ignoring 85°C glitch on sensor %d (neighbor: %.2f°C)", i, neighborTemp);
+                    logger.logf(Logger::WARN, TEMPRETURE_LOG_MODULE, "Ignoring 85°C glitch on sensor %d (neighbor: %.2f°C)", i, neighborTemp);
                     continue;
                 }
             }
@@ -80,7 +77,7 @@ float TempManager::getAverageTemp()
         }
         else
         {
-            LOG.logf(Logger::ERROR, TEMPRETURE_LOG_MODULE, "Sensor %d exceeded max limit: %.2f°C", i, currentTemp);
+            logger.logf(Logger::ERROR, TEMPRETURE_LOG_MODULE, "Sensor %d exceeded max limit: %.2f°C", i, currentTemp);
         }
     }
 
@@ -88,7 +85,7 @@ float TempManager::getAverageTemp()
 
     if (validCount == 0)
     {
-        LOG.log(Logger::ERROR, TEMPRETURE_LOG_MODULE, "No valid temperature readings");
+        logger.log(Logger::ERROR, TEMPRETURE_LOG_MODULE, "No valid temperature readings");
         return TEMP_DISCONNECTED;
     }
 
@@ -101,13 +98,13 @@ float TempManager::getAverageTemp()
         float filteredSum = 0.0;
         int filteredCount = 0;
 
-        LOG.logf(Logger::DEBUG, TEMPRETURE_LOG_MODULE, "Median temperature: %.2f°C", medianTemp);
+        logger.logf(Logger::DEBUG, TEMPRETURE_LOG_MODULE, "Median temperature: %.2f°C", medianTemp);
 
         for (float temp : validTemperatures)
         {
             if (std::abs(temp - medianTemp) > BUBBLE_DEVIATION_THRESHOLD)
             {
-                LOG.logf(Logger::WARN, TEMPRETURE_LOG_MODULE, "Outlier detected (possible bubble): %.2f°C", temp);
+                logger.logf(Logger::WARN, TEMPRETURE_LOG_MODULE, "Outlier detected (possible bubble): %.2f°C", temp);
             }
         }
 
@@ -124,7 +121,7 @@ float TempManager::getAverageTemp()
 
     float average = simpleSum / validCount;
 
-    LOG.logf(Logger::DEBUG, TEMPRETURE_LOG_MODULE, "Simple average: %.2f°C (from %d sensors)", average, validCount);
+    logger.logf(Logger::DEBUG, TEMPRETURE_LOG_MODULE, "Simple average: %.2f°C (from %d sensors)", average, validCount);
 
     return average;
 }

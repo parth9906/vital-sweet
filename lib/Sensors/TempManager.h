@@ -10,11 +10,12 @@ private:
     OneWire oneWire;
     DallasTemperature sensors;
     int sensorCount;
+    Logger& logger;
 
 public:
     TempManager(int pin);
     void begin();
-    float getTempByIndex(int index); // Returns temp for sensor 0, 1, or 2
+    float getTempByIndex(int index);
     float getAverageTemp();
 };
 
