@@ -119,6 +119,25 @@ void JeggeryProcessingMachine::updateConfigFromJson(const char* json) {
     Serial.println("Machine Config Updated.");
 }
 
+void JeggeryProcessingMachine::transitionToNextState() {
+    JeggeryProcessState* next = nullptr;
+
+    if (currentState == idleState)           next = fillingState;
+    else if (currentState == fillingState)   next = boilingState;
+    else if (currentState == boilingState)   next = oilSprayState;
+    else if (currentState == oilSprayState)  next = finishingState;
+    else if (currentState == finishingState) next = unloadingState;
+    else if (currentState == unloadingState) next = resettingState;
+    else if (currentState == resettingState) next = idleState;
+
+    if (next != nullptr) {
+        logger.logf(Logger::INFO, JEGGERY_PROCESSING_MACHINE_MODULE, 
+                    "Manual Step: %s -> %s", getCurrentStateName(), idToState(stateToId(next)));
+        this->transitionTo(next);
+    }
+}
+
+
 
 
 void JeggeryProcessingMachine::setJuiceFillingValve(bool open) {

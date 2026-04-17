@@ -40,6 +40,7 @@ public:
             stateStartTime = millis();
         }
     }
+    void transitionToNextState();
 
     void update();
     void handleHeartbeat();

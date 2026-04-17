@@ -1,34 +1,39 @@
 #pragma once
 
+#include <Arduino.h>
 #include "HX711.h"
-#include "Logger.h"
-
-#define WEIGHT_LOG_MODULE "WeightManager"
+#include <Preferences.h>
 
 class WeightManager {
 private:
     HX711 scale;
-    Logger& logger;
-
+    Preferences prefs;
+    
+    String namespaceName;
     float calibrationFactor;
+    long offset; // The 'tare' value
     bool initialized;
+    int doutPin;
 
-    static const int samples = 5;
-    static constexpr float minValidWeight = -100.0f;
-    static constexpr float maxValidWeight = 100000.0f;
-
-    bool isValid(float value);
+    static constexpr float NOISE_THRESHOLD = 0.5f; // Ignore fluctuations smaller than this
+    
+    void loadSettings();
+    void saveSettings();
 
 public:
-    explicit WeightManager(float calib = -7050.0f);
+    // Give each instance a unique name (e.g., "scale1", "scale2") for NVS storage
+    explicit WeightManager(const char* name, float defaultCalib = -7050.0f);
 
     bool begin(int dout, int pd_sck);
-
-    float getWeight();
-    float getStableWeight(int attempts = 3);
-
+    
+    // Core functions
+    float getWeight(int samples = 5);
+    float getStableWeight(int samples = 15); // Uses median filter for stability
+    
     void tare();
-
     void setCalibration(float factor);
-    float getCalibration() const;
+    
+    // Production helpers
+    bool isConnected();
+    void resetFactory(); // Clears NVS settings
 };

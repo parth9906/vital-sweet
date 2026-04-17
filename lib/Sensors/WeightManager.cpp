@@ -1,103 +1,87 @@
 #include "WeightManager.h"
-#include <Arduino.h> 
 
-WeightManager::WeightManager(float calib)
-    : logger(Logger::getInstance()),
-      calibrationFactor(calib),
-      initialized(false) {}
-
-bool WeightManager::isValid(float value) {
-    return !isnan(value) && isfinite(value) &&
-           value > minValidWeight && value < maxValidWeight;
-}
+WeightManager::WeightManager(const char* name, float defaultCalib) 
+    : namespaceName(name), calibrationFactor(defaultCalib), initialized(false) {}
 
 bool WeightManager::begin(int dout, int pd_sck) {
-    logger.log(Logger::INFO, WEIGHT_LOG_MODULE, "Initializing HX711...");
-
+    doutPin = dout;
     scale.begin(dout, pd_sck);
 
-    if (!scale.is_ready()) {
-        logger.log(Logger::ERROR, WEIGHT_LOG_MODULE, "HX711 not responding!");
-        return false;
+    // HX711 Warm-up/Check
+    unsigned long start = millis();
+    while (!scale.is_ready() && millis() - start < 2000) {
+        delay(10);
     }
 
+    if (!scale.is_ready()) return false;
+
+    loadSettings(); // Load saved calibration and offset from Flash
+    
     scale.set_scale(calibrationFactor);
-    scale.tare();
-
+    scale.set_offset(offset);
+    
     initialized = true;
-
-    logger.log(Logger::INFO, WEIGHT_LOG_MODULE, "HX711 initialized successfully");
     return true;
 }
 
-float WeightManager::getWeight() {
-    if (!initialized) {
-        logger.log(Logger::ERROR, WEIGHT_LOG_MODULE, "Read before initialization");
-        return -1.0f;
-    }
-
-    if (!scale.is_ready()) {
-        logger.log(Logger::WARN, WEIGHT_LOG_MODULE, "HX711 not ready");
-        return -1.0f;
-    }
-
-    float weight = scale.get_units(samples);
-
-    logger.logf(Logger::DEBUG, WEIGHT_LOG_MODULE,
-                "Raw weight: %.2f", weight);
-
-    if (!isValid(weight)) {
-        logger.log(Logger::WARN, WEIGHT_LOG_MODULE, "Invalid weight value");
-        return -1.0f;
-    }
-
-    return weight;
+void WeightManager::loadSettings() {
+    prefs.begin(namespaceName.c_str(), true); // Read-only mode
+    calibrationFactor = prefs.getFloat("cal", calibrationFactor);
+    offset = prefs.getLong("off", 0);
+    prefs.end();
 }
 
-float WeightManager::getStableWeight(int attempts) {
-    float total = 0.0f;
-    int validReads = 0;
+void WeightManager::saveSettings() {
+    prefs.begin(namespaceName.c_str(), false); // Read-write mode
+    prefs.putFloat("cal", calibrationFactor);
+    prefs.putLong("off", offset);
+    prefs.end();
+}
 
-    for (int i = 0; i < attempts; i++) {
-        float w = getWeight();
+float WeightManager::getWeight(int samples) {
+    if (!initialized || !scale.is_ready()) return 0.0f;
+    
+    float val = scale.get_units(samples);
+    // Suppress jitter near zero
+    return (abs(val) < NOISE_THRESHOLD) ? 0.0f : val;
+}
 
-        if (w > 0) {
-            total += w;
-            validReads++;
+float WeightManager::getStableWeight(int samples) {
+    if (!initialized || !scale.is_ready()) return 0.0f;
+
+    float readings[samples];
+    for (int i = 0; i < samples; i++) {
+        readings[i] = scale.get_units(1);
+        delay(5); 
+    }
+
+    // Simple Bubble Sort to find Median (Production Stable)
+    for (int i = 0; i < samples - 1; i++) {
+        for (int j = 0; j < samples - i - 1; j++) {
+            if (readings[j] > readings[j + 1]) {
+                float temp = readings[j];
+                readings[j] = readings[j + 1];
+                readings[j + 1] = temp;
+            }
         }
-
-        delay(50); // small delay for stability
     }
 
-    if (validReads == 0) {
-        logger.log(Logger::ERROR, WEIGHT_LOG_MODULE, "No valid readings");
-        return -1.0f;
-    }
-
-    float avg = total / validReads;
-
-    logger.logf(Logger::INFO, WEIGHT_LOG_MODULE, "Stable weight: %.2f", avg);
-
-    return avg;
+    float median = readings[samples / 2];
+    return (abs(median) < NOISE_THRESHOLD) ? 0.0f : median;
 }
 
 void WeightManager::tare() {
-    if (!initialized) {
-        logger.log(Logger::WARN, WEIGHT_LOG_MODULE, "Tare before init ignored");
-        return;
-    }
-
-    logger.log(Logger::INFO, WEIGHT_LOG_MODULE, "Taring scale...");
-    scale.tare();
+    scale.tare(20); // Average of 20 for a clean zero
+    offset = scale.get_offset();
+    saveSettings(); // Persist to Flash
 }
 
 void WeightManager::setCalibration(float factor) {
     calibrationFactor = factor;
     scale.set_scale(calibrationFactor);
-
-    logger.logf(Logger::INFO, WEIGHT_LOG_MODULE, "Calibration updated: %.2f", calibrationFactor);
+    saveSettings(); // Persist to Flash
 }
 
-float WeightManager::getCalibration() const {
-    return calibrationFactor;
+bool WeightManager::isConnected() {
+    return scale.is_ready();
 }

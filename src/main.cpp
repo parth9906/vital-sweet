@@ -4,11 +4,15 @@
 #include "Logger.h"
 #include "NetworkDispatcher.h"
 #include "NetworkConfig.h"
+#include "WeightManager.h"
 
 // Define Watchdog Timeout (5 seconds is safe for industrial tasks)
 #define WDT_TIMEOUT_SECONDS 10
 void syncConfiguration(); 
+
 JeggeryProcessingMachine machine;
+WeightManager leftScale("left_side", -7050.0f);
+WeightManager rightScale("right_side", -7100.0f);
 Logger &logger = Logger::getInstance();
 
 void machineProcessTask(void *pvParameters) {
@@ -42,10 +46,16 @@ void setup() {
         1                     /* Core 1 */
     );
 
+    if (leftScale.begin(5, 4)) logger.logf(Logger::INFO, "SYSTEM","Left Scale Online");
+    if (rightScale.begin(18, 19)) logger.logf(Logger::INFO, "SYSTEM","Right Scale Online");
+
     logger.logf(Logger::INFO, "SYSTEM", "Setup Complete. Task Dispatched.");
 }
 
 void loop() {
+
+    float w1 = leftScale.getStableWeight();
+    float w2 = rightScale.getStableWeight();
     vTaskDelay(pdMS_TO_TICKS(1000)); 
 }
 
