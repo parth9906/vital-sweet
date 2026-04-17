@@ -45,7 +45,21 @@ void JeggeryProcessingMachine::begin() {
 void JeggeryProcessingMachine::update() {
     if (currentState) {
         currentState->update(*this);
-        // handleHeartbeat();
+    }
+    static uint32_t lastLogMillis = 0;
+    const uint32_t LOG_INTERVAL = 30000; // 30 seconds
+
+    if (millis() - lastLogMillis >= LOG_INTERVAL) {
+        logger.logf(Logger::INFO, "MACHINE", "Current State: %s", getCurrentStateName());
+        lastLogMillis = millis();
+
+        logger.logf(Logger::INFO, "CONFIG", 
+                "Auto: %s | Target Brix: %.1f | Oil Temp: %.1f | Finish Temp: %.1f",
+                config.isAutoModeEnabled ? "YES" : "NO",
+                config.targetJaggeryBrix,
+                config.oilSprayTemperatureThreshold,
+                config.finishingPhaseTempThreshold
+            );
     }
 }
 
@@ -86,6 +100,26 @@ const char* JeggeryProcessingMachine::getCurrentStateName() {
     if (currentState == resettingState) return "RESETTING";
     return "UNKNOWN";
 }
+
+#include <ArduinoJson.h>
+
+void JeggeryProcessingMachine::updateConfigFromJson(const char* json) {
+    JsonDocument configs; 
+    DeserializationError error = deserializeJson(configs, json);
+
+    if (error) {
+        Serial.printf("Config Update Failed: %s\n", error.c_str());
+        return;
+    }
+
+    JsonVariant settingsObj = configs["settings"];
+
+    config.updateFromJson(settingsObj);
+    
+    Serial.println("Machine Config Updated.");
+}
+
+
 
 void JeggeryProcessingMachine::setJuiceFillingValve(bool open) {
     // Add physical GPIO code here

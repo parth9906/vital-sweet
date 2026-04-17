@@ -3,7 +3,7 @@
 
     namespace NetworkConfig {
         // Wi-Fi Credentials
-        const char* const SSID = "Airprin_5G";
+        const char* const SSID = "Airprin_2.4G";
         const char* const PASS = "par798542";
 
         // Server Endpoints

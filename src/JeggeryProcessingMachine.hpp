@@ -44,6 +44,7 @@ public:
     void update();
     void handleHeartbeat();
     const char* getCurrentStateName();
+    void updateConfigFromJson(const char* jsonString);
 
     // Declare these (Implementation must be in .cpp)
     void setJuiceFillingValve(bool open);

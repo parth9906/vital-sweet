@@ -9,15 +9,28 @@ uint8_t NetworkDispatcher::counter = 1;
 
 void NetworkDispatcher::task(void* pv) {
     HTTPClient http;
-
+    WiFi.mode(WIFI_STA); 
+    WiFi.begin(NetworkConfig::SSID, NetworkConfig::PASS);
     for (;;) {
-
-    
         if (WiFi.status() != WL_CONNECTED) {
-            Logger::getInstance().log(Logger::WARN, NET_MODULE, "WiFi lost, reconnecting");
-            WiFi.begin(NetworkConfig::SSID, NetworkConfig::PASS);
-            vTaskDelay(pdMS_TO_TICKS(500));
-            continue;
+            Logger::getInstance().log(Logger::WARN, NET_MODULE, "Connecting to WiFi...");
+            
+            // 2. Wait and check status without re-calling .begin() constantly
+            int retry = 0;
+            while (WiFi.status() != WL_CONNECTED && retry < 20) { 
+                vTaskDelay(pdMS_TO_TICKS(500));
+                retry++;
+            }
+
+            // 3. If still not connected after 10 seconds, then try begin() again
+            if (WiFi.status() != WL_CONNECTED) {
+                Logger::getInstance().log(Logger::ERROR, NET_MODULE, "Failed. Retrying begin...");
+                WiFi.disconnect();
+                WiFi.begin(NetworkConfig::SSID, NetworkConfig::PASS);
+                vTaskDelay(pdMS_TO_TICKS(2000));
+                continue;
+            }
+            Logger::getInstance().log(Logger::INFO, NET_MODULE, "Connected!");
         }
 
         HttpRequest req;

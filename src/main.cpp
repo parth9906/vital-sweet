@@ -3,10 +3,11 @@
 #include "JeggeryProcessingMachine.hpp"
 #include "Logger.h"
 #include "NetworkDispatcher.h"
+#include "NetworkConfig.h"
 
 // Define Watchdog Timeout (5 seconds is safe for industrial tasks)
-#define WDT_TIMEOUT_SECONDS 5
-
+#define WDT_TIMEOUT_SECONDS 10
+void syncConfiguration(); 
 JeggeryProcessingMachine machine;
 Logger &logger = Logger::getInstance();
 
@@ -19,20 +20,18 @@ void machineProcessTask(void *pvParameters) {
     for (;;) {
         esp_task_wdt_reset();
         machine.update();
-        vTaskDelay(pdMS_TO_TICKS(20));
+        syncConfiguration();
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
 
 void setup() {
-    // Note: USB CDC (USB Serial) might not be ready immediately 
-    // Add a small delay so you don't miss initial logs
     Serial.begin(115200);
-    delay(1000); 
-    NetworkDispatcher::begin();
-    logger.setLevel(Logger::DEBUG);
-    logger.logf(Logger::INFO, "SYSTEM", "Starting Jeggery Machine...");
 
-    // 6. START THE TASK (Missing in your snippet)
+    logger.setLevel(Logger::INFO);
+    logger.logf(Logger::INFO, "SYSTEM", "Starting Jeggery Machine...");
+    NetworkDispatcher::begin();
+
     xTaskCreatePinnedToCore(
         machineProcessTask,   /* Function */
         "JeggeryLogic",       /* Name */
@@ -47,6 +46,35 @@ void setup() {
 }
 
 void loop() {
-    // Standard loop on Core 0
     vTaskDelay(pdMS_TO_TICKS(1000)); 
+}
+
+
+
+void syncConfiguration() {
+    static uint32_t lastSyncMillis = 0;
+    static uint8_t pendingRequestId = 0;
+    static bool isRequestActive = false;
+    
+    const uint32_t SYNC_INTERVAL = 30000; // 30 seconds
+
+    // Phase 1: Send Request
+    if (!isRequestActive && (millis() - lastSyncMillis > SYNC_INTERVAL)) {
+        pendingRequestId = NetworkDispatcher::get(NetworkConfig::SYNC_URL.c_str());
+        isRequestActive = true;
+        lastSyncMillis = millis();
+    }
+
+    // Phase 2: Poll for Response
+    HttpResponse res;
+    if (NetworkDispatcher::read(res)) {
+        if (res.id == pendingRequestId) {
+            if (res.code == 200) {
+                machine.updateConfigFromJson(res.body);
+            } else {
+                Serial.printf("Sync failed: %d\n", res.code);
+            }
+            isRequestActive = false; // Reset for next cycle
+        }
+    }
 }
